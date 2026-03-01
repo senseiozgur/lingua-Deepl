@@ -96,6 +96,30 @@ export function createJobsRouter(deps: {
     });
   });
 
+  router.get("/:id/output", async (req, res) => {
+    const job = deps.jobs.get(req.params.id);
+    if (!job) {
+      res.status(404).json({ error: "job_not_found" });
+      return;
+    }
+    if (job.status !== "READY") {
+      res.status(409).json({ error: "job_not_ready" });
+      return;
+    }
+    if (!job.output_file_path) {
+      res.status(404).json({ error: "output_not_found" });
+      return;
+    }
+
+    try {
+      const bytes = await deps.storage.readFile(job.output_file_path);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", 'attachment; filename="translated.pdf"');
+      res.status(200).send(bytes);
+    } catch {
+      res.status(404).json({ error: "output_not_found" });
+    }
+  });
+
   return router;
 }
-
