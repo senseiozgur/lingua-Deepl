@@ -89,7 +89,10 @@ export class DeepLProvider implements TranslationProvider {
       return { code: "PROVIDER_UNKNOWN", http_status: err.status, retryable: false };
     }
 
-    if (err instanceof Error && err.name === "AbortError") {
+    if (
+      (err instanceof Error && err.name === "AbortError") ||
+      (typeof err === "object" && err !== null && "name" in err && (err as { name: string }).name === "AbortError")
+    ) {
       return { code: "PROVIDER_TIMEOUT", retryable: true };
     }
 
