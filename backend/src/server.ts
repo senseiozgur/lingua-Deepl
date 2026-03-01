@@ -1,10 +1,10 @@
 import { createApp } from "./app";
+import { loadConfig } from "./config";
 
-const port = Number(process.env.PORT || 3000);
-const app = createApp();
+const config = loadConfig(process.env);
+const app = createApp(config);
 
-app.listen(port, () => {
+app.listen(config.port, () => {
   // Keep logging minimal for MVP startup diagnostics.
-  console.log(`server listening on :${port}`);
+  console.log(`server listening on :${config.port}`);
 });
-
