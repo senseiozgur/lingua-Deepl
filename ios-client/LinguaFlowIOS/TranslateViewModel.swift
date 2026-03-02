@@ -75,6 +75,9 @@ final class TranslateViewModel: ObservableObject {
                             isProcessing = false
                             stopPolling()
                             return
+                        } catch APIClientError.backendError(let code) where code == "job_not_ready" {
+                            // READY can race output availability; keep polling.
+                            break
                         } catch {
                             isProcessing = false
                             userMessage = displayMessage(for: error)
@@ -108,10 +111,9 @@ final class TranslateViewModel: ObservableObject {
             case .backendError(let code):
                 return code
             default:
-                return apiError.localizedDescription
+                return "client_error"
             }
         }
-        return "Unexpected error"
+        return "client_error"
     }
 }
-

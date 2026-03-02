@@ -58,7 +58,7 @@ The app:
 - runs the job,
 - polls every 2 seconds,
 - handles `job_already_running` by continuing polling,
+- retries output download when backend returns `409 job_not_ready` after `READY`,
 - downloads translated PDF on `READY`,
 - saves to `Documents/linguaflow/<job_id>.pdf`,
 - opens with QuickLook and supports share sheet.
-
