@@ -67,9 +67,11 @@ export function createJobsRouter(deps: {
       return;
     }
 
-    if (job.status === "PENDING") {
-      deps.runner.runAsync(job.id);
+    if (job.status !== "PENDING") {
+      res.status(409).json({ error: "job_already_running" });
+      return;
     }
+    deps.runner.runAsync(job.id);
     res.status(202).json({ accepted: true, job_id: job.id, status: job.status });
   });
 
