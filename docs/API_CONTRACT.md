@@ -1,33 +1,46 @@
-# API CONTRACT (Mobile Integration)
+# API Contract (Backend <-> iOS)
 
-This document is the canonical, stable API contract between backend and iOS app integration.
+This document reflects the current backend implementation in:
+- `backend/src/app.ts`
+- `backend/src/routes/jobs.routes.ts`
 
 ## API Base
 
-- Base URL (local): `http://localhost:3000`
-- JSON endpoints use `Content-Type: application/json`
-- Upload endpoint uses `multipart/form-data`
-- JSON encoding: UTF-8
-- Error response format:
+- Local base URL: `http://localhost:3000`
+- JSON endpoints return `application/json`
+- Upload endpoint (`POST /jobs`) accepts `multipart/form-data`
+- Download endpoint (`GET /jobs/:id/output`) returns binary PDF
+
+Default JSON error shape:
 
 ```json
-{ "error": "error_code_string" }
+{ "error": "error_code" }
 ```
 
 ## Endpoints
 
-### 1) POST /jobs
+### GET /health
 
-Description: Upload PDF and create job.
+Success (`200`):
+
+```json
+{ "ok": true }
+```
+
+---
+
+### POST /jobs
+
+Description: Upload PDF and create a translation job.
 
 Request:
 - `multipart/form-data`
 - fields:
-- `file` (PDF)
-- `target_lang` (string)
+  - `file` (required, must have `.pdf` filename extension)
+  - `target_lang` (required, string)
+  - `source_lang` (optional, string)
 
-Success:
-- `201`
+Success (`201`):
 
 ```json
 {
@@ -36,69 +49,95 @@ Success:
 }
 ```
 
-Validation Errors:
-- `400`
+Errors:
+
+`400`
 
 ```json
 { "error": "file is required" }
 ```
 
+`400`
+
 ```json
 { "error": "target_lang is required" }
 ```
+
+`400`
 
 ```json
 { "error": "only pdf is accepted" }
 ```
 
+`500`
+
+```json
+{ "error": "internal_error" }
+```
+
 ---
 
-### 2) POST /jobs/:id/run
+### POST /jobs/:id/run
 
-Success:
-- `202`
+Success (`202`):
 
 ```json
 {
   "accepted": true,
   "job_id": "string",
-  "status": "PENDING|PROCESSING"
+  "status": "PENDING"
 }
 ```
 
 Errors:
-- `404`
+
+`404`
 
 ```json
 { "error": "job_not_found" }
 ```
 
+`409`
+
+```json
+{ "error": "job_already_running" }
+```
+
+Deterministic rule:
+- If job status is not `PENDING`, response is always `409 job_already_running`.
+
 ---
 
-### 3) GET /jobs/:id
+### GET /jobs/:id
 
-Success:
-- `200`
+Success (`200`):
 
 ```json
 {
   "job_id": "string",
   "status": "PENDING|PROCESSING|READY|FAILED",
   "progress_pct": 0,
-  "output_file_path": "string|null",
-  "error_code": "string|null",
+  "output_file_path": null,
+  "error_code": null,
   "billing": {
-    "request_id": "string|null",
-    "billing_request_id": "string|null",
+    "request_id": null,
+    "billing_request_id": null,
     "charged_units": 0,
-    "charged": true,
+    "charged": false,
     "refunded": false
   }
 }
 ```
 
+Notes:
+- `output_file_path` is `string` when `READY`, otherwise `null`.
+- `error_code` is normalized provider code when failed, otherwise `null`.
+- `billing.request_id` is `string|null`.
+- `billing.billing_request_id` is `string|null`.
+
 Errors:
-- `404`
+
+`404`
 
 ```json
 { "error": "job_not_found" }
@@ -106,67 +145,44 @@ Errors:
 
 ---
 
-### 4) GET /jobs/:id/output
+### GET /jobs/:id/output
 
-Description: Download translated PDF.
+Description: Download translated PDF bytes.
 
-Success:
-- `200`
+Success (`200`):
 - `Content-Type: application/pdf`
-- Binary PDF response body
+- `Content-Disposition: attachment; filename="translated.pdf"`
+- Body: binary PDF bytes
 
 Errors:
-- `404`
+
+`404`
 
 ```json
 { "error": "job_not_found" }
 ```
 
-- `409`
+`409`
 
 ```json
 { "error": "job_not_ready" }
 ```
 
-- `404`
+`404`
 
 ```json
 { "error": "output_not_found" }
 ```
 
----
+Deterministic rule:
+- If job status is not `READY`, response is always `409 job_not_ready`.
 
-## Error Codes
+## Provider Error Normalization
 
-Provider normalized error codes:
+Normalized provider error codes exposed via `GET /jobs/:id` -> `error_code`:
+
 - `PROVIDER_RATE_LIMIT`
 - `PROVIDER_TIMEOUT`
 - `PROVIDER_QUOTA_EXCEEDED`
 - `PROVIDER_UPSTREAM_5XX`
 - `PROVIDER_UNKNOWN`
-
----
-
-## State Machine
-
-`PENDING -> PROCESSING -> READY`
-
-`PENDING -> PROCESSING -> FAILED`
-
----
-
-## Mobile Integration Notes
-
-- Poll interval: 2 seconds
-- Stop polling when `READY` or `FAILED`
-- Download output only when `READY`
-- Never expose internal provider messages
-
----
-
-## Stability Rules
-
-- Do not change existing endpoints
-- Do not modify backend logic for this contract document
-- This document is canonical and must match code
-
